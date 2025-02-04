@@ -11,10 +11,10 @@ from urllib3.util.retry import Retry
 
 # 配置参数
 PDF_DIR = "./pdfs"
-MAX_RETRIES = 3
-BACKOFF_FACTOR = 2
+MAX_RETRIES = 10 # 最大重试次数
+BACKOFF_FACTOR = 2 # 超时回退系数
 MAX_PDF_PAGES = 10  # 最大解析页数
-CHUNK_SIZE = 1024   # 文本分块长度
+CHUNK_SIZE = 10000   # 文本分块长度
 
 def setup_requests_session():
     """配置带重试机制的请求会话"""
@@ -105,7 +105,7 @@ def process_chunk(session, api_key: str, chunk: str, url: str, chunk_num: int, t
         response = session.post(
             url="https://api.siliconflow.cn/v1/chat/completions",
             json={
-                "model": "deepseek-ai/DeepSeek-R1",
+                "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
                 "max_tokens": 4096
@@ -113,6 +113,9 @@ def process_chunk(session, api_key: str, chunk: str, url: str, chunk_num: int, t
             headers={"Authorization": f"Bearer {api_key}"},
         )
         response.raise_for_status()
+
+        print(f"当前进度：{chunk_num}/{total_chunks}")
+
         return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"分块处理失败: {str(e)}")
@@ -137,7 +140,7 @@ def generate_final_summary(session, api_key: str, chunks: List[str], url: str) -
         response = session.post(
             url="https://api.siliconflow.cn/v1/chat/completions",
             json={
-                "model": "deepseek-ai/DeepSeek-R1",
+                "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
                 "messages": [{"role": "user", "content": summary_prompt}],
                 "temperature": 0.2,
                 "max_tokens": 2048
@@ -198,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument('--path', required=True, help='输入目录路径')
     args = parser.parse_args()
 
-    API_KEY = "sk-njzodcflskxlqmgivmjvhstiznalyhbkhwxlmsajzbwnvzet"
+    API_KEY = ""
     
     # 初始化环境
     os.makedirs(PDF_DIR, exist_ok=True)
