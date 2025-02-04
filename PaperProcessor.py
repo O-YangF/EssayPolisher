@@ -14,7 +14,7 @@ PDF_DIR = "./pdfs"
 MAX_RETRIES = 10 # 最大重试次数
 BACKOFF_FACTOR = 2 # 超时回退系数
 MAX_PDF_PAGES = 10  # 最大解析页数
-CHUNK_SIZE = 10000   # 文本分块长度
+CHUNK_SIZE = 4000   # 文本分块长度
 
 def setup_requests_session():
     """配置带重试机制的请求会话"""
