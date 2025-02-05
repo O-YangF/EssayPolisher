@@ -2,19 +2,32 @@ import argparse
 import os
 import re
 import time
-import requests
-import pdfplumber
+import requests # type: ignore
+import pdfplumber # type: ignore
 from typing import List, Tuple
 from urllib.parse import urlparse
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter # type: ignore
+from urllib3.util.retry import Retry # type: ignore
+from init import get_config # type: ignore
 
-# 配置参数
-PDF_DIR = "./pdfs"
-MAX_RETRIES = 10 # 最大重试次数
-BACKOFF_FACTOR = 2 # 超时回退系数
-MAX_PDF_PAGES = 10  # 最大解析页数
-CHUNK_SIZE = 4000   # 文本分块长度
+config = get_config()
+
+# 使用配置参数
+PDF_DIR = config.PDF_DIR  # PDF 文件保存目录
+RESULT_DIR = config.RESULT_DIR  # 分析结果保存目录
+SEARCH_DIR = config.SEARCH_DIR  # 论文检索结果保存目录
+Path = config.Path  #输入目录路径（包含论文链接文件）
+
+MAX_RETRIES = config.MAX_RETRIES # 最大重试次数
+BACKOFF_FACTOR = config.BACKOFF_FACTOR # 超时回退系数
+MAX_PDF_PAGES = config.MAX_PDF_PAGES  # 最大解析页数
+CHUNK_SIZE = config.CHUNK_SIZE   # 文本分块长度
+
+API_KEY = config.API_KEY  # API 密钥
+API_URL = config.API_URL  # API 地址
+MODEL_ID = config.MODEL_ID  # 模型 ID
+
+
 
 def setup_requests_session():
     """配置带重试机制的请求会话"""
@@ -89,28 +102,66 @@ def extract_pdf_text(pdf_path: str) -> List[str]:
         print(f"解析PDF失败 {pdf_path}: {str(e)}")
         return []
 
-def process_chunk(session, api_key: str, chunk: str, url: str, chunk_num: int, total_chunks: int) -> str:
+def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: int) -> str:
     """处理单个文本块"""
-    prompt = f"""请分析论文片段（来自{url}）：
+    prompt = f"""作为计算机科学领域研究员，请基于以下材料撰写论文分析报告（来自{url})：
                 {chunk[:CHUNK_SIZE]}
-
-                当前进度：{chunk_num}/{total_chunks}
-                请提取：
-                1. 本段核心观点
-                2. 关键技术术语（中英对照）
-                3. 重要实验数据
-                4. 需要后续验证的内容"""
+                由于我提供给你的论文材料的一小块分块材料，当前进度：{chunk_num}/{total_chunks}，故请你首先判断该块属于论文的哪一大部分
+                （例如"abstract", "introduction", "method", "experiment", "conclusion"……等等关键章节），然后请你根据该关键章节选取下面要点进行组织内容，
+                无须全部写全，根据要点进行有倾向性的总结即可（例如摘要部分可以着重总结“核心问题解析”，而method部分可以着重总结“方法创新”
+                请严格按以下结构与你自己的判断有倾向性地选取结构中的部分进行组织内容（使用中文Markdown格式）：
+                ## 核心问题解析
+                    1. **研究动机**：用"问题三角"框架说明：
+                    - 领域现状：当前领域的主流方法
+                    - 现存缺陷：现有方法的3个局限性
+                    - 本文目标：拟解决的关键问题
+                    2. **可行性论证**：分析论文中提出的理论/技术可行性证据
+                ## 方法创新
+                    1. **技术路线图**：用流程图描述整体框架（文字形式）
+                    2. **核心创新点**（对比分析）：
+                    | 对比维度 | 传统方法 | 本文方法 | 优势分析 |
+                    |---------|---------|---------|---------|
+                    | [维度1] | ...     | ...     | ...     |
+                    | [维度2] | ...     | ...     | ...     |
+                    3. **关键公式**（至少2个）：
+                    - 公式1：$$...$$ （说明物理意义）
+                    - 公式2：$$...$$ （解释创新点）
+                ## 实验验证
+                    1. **实验设置**：
+                    - 数据集构成（训练/测试比例）
+                    - 基线模型选择逻辑
+                    - 评估指标合理性分析
+                    2. **关键结果**：
+                    - 主实验结果（附重要数据表格）
+                    - 消融实验结论
+                    - 计算效率对比（如FLOPS/内存占用）
+                ## 学术贡献
+                    1. **理论贡献**（分点说明）
+                    2. **实践价值**（对工业界的影响）
+                ## 批判性分析
+                    1. **方法局限性**（分3点说明）
+                    2. **改进建议**（提出2条可行方向）
+                    3. **可复现性**：根据论文描述评估复现难度
+                ## 延伸思考
+                    1. **关联工作**：列出3篇相关论文（非本文参考文献）并说明关联性
+                    2. **应用场景**：预测可能产生影响的3个领域
+                【写作要求】
+                    1. 专业术语中英对照（如：注意力机制, Attention Mechanism）
+                    2. 重要结论需标注PDF出处（例：见PDF P5, Section 3.2）
+                    3. 避免直接翻译原文，需体现分析深度
+                    4. 争议性观点需标注"需进一步验证"
+                    """
 
     try:
         response = session.post(
-            url="https://api.siliconflow.cn/v1/chat/completions",
+            url = API_URL,
             json={
-                "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+                "model": MODEL_ID,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
-                "max_tokens": 4096
+                "max_tokens": 8192
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {API_KEY}"},
         )
         response.raise_for_status()
 
@@ -121,31 +172,75 @@ def process_chunk(session, api_key: str, chunk: str, url: str, chunk_num: int, t
         print(f"分块处理失败: {str(e)}")
         return ""
 
-def generate_final_summary(session, api_key: str, chunks: List[str], url: str) -> str:
+def generate_final_summary(session, chunks: List[str], url: str) -> str:
     """生成最终汇总报告"""
-    summary_prompt = f"""根据以下分析片段汇总论文：
+    summary_prompt = f"""作为计算机科学领域研究员，请根据以下分析片段汇总论文：
                         论文地址: {url}
                         分析片段:
                         {'-'*40}
                         {'\n\n'.join(chunks)}
                         {'-'*40}
 
-                        请按以下结构组织：
-                        ## 核心贡献
-                        ## 技术路线
-                        ## 实验结果
-                        ## 局限性与展望"""
+                        请严格按以下结构组织内容（使用中文Markdown格式）：
+
+                        ## 核心问题解析
+                        1. **研究动机**：用"问题三角"框架说明：
+                        - 领域现状：当前领域的主流方法
+                        - 现存缺陷：现有方法的3个局限性
+                        - 本文目标：拟解决的关键问题
+                        2. **可行性论证**：分析论文中提出的理论/技术可行性证据
+
+                        ## 方法创新
+                        1. **技术路线图**：用流程图描述整体框架（文字形式）
+                        2. **核心创新点**（对比分析）：
+                        | 对比维度 | 传统方法 | 本文方法 | 优势分析 |
+                        |---------|---------|---------|---------|
+                        | [维度1] | ...     | ...     | ...     |
+                        | [维度2] | ...     | ...     | ...     |
+                        3. **关键公式**（至少2个）：
+                        - 公式1：$$...$$ （说明物理意义）
+                        - 公式2：$$...$$ （解释创新点）
+
+                        ## 实验验证
+                        1. **实验设置**：
+                        - 数据集构成（训练/测试比例）
+                        - 基线模型选择逻辑
+                        - 评估指标合理性分析
+                        2. **关键结果**：
+                        - 主实验结果（附重要数据表格）
+                        - 消融实验结论
+                        - 计算效率对比（如FLOPS/内存占用）
+
+                        ## 学术贡献
+                        1. **理论贡献**（分点说明）
+                        2. **实践价值**（对工业界的影响）
+
+                        ## 批判性分析
+                        1. **方法局限性**（分3点说明）
+                        2. **改进建议**（提出2条可行方向）
+                        3. **可复现性**：根据论文描述评估复现难度
+
+                        ## 延伸思考
+                        1. **关联工作**：列出3篇相关论文（非本文参考文献）并说明关联性
+                        2. **应用场景**：预测可能产生影响的3个领域
+
+                        【写作要求】
+                        1. 专业术语中英对照（如：注意力机制, Attention Mechanism）
+                        2. 重要结论需标注PDF出处（例：见PDF P5, Section 3.2）
+                        3. 避免直接翻译原文，需体现分析深度
+                        4. 争议性观点需标注"需进一步验证"
+                        """
 
     try:
         response = session.post(
-            url="https://api.siliconflow.cn/v1/chat/completions",
+            url = API_URL,
             json={
-                "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+                "model": MODEL_ID,
                 "messages": [{"role": "user", "content": summary_prompt}],
                 "temperature": 0.2,
-                "max_tokens": 2048
+                "max_tokens": 8192
             },
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"Authorization": f"Bearer {API_KEY}"},
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
@@ -153,7 +248,7 @@ def generate_final_summary(session, api_key: str, chunks: List[str], url: str) -
         print(f"汇总失败: {str(e)}")
         return "生成完整摘要失败，请查看分块分析结果"
 
-def process_paper(session, api_key: str, filename: str, url: str, result_dir: str):
+def process_paper(session, filename: str, url: str, result_dir: str):
     """处理单篇论文"""
     try:
         # 下载PDF
@@ -172,49 +267,55 @@ def process_paper(session, api_key: str, filename: str, url: str, result_dir: st
         # 处理分块
         chunk_results = []
         for idx, chunk in enumerate(text_chunks, 1):
-            result = process_chunk(session, api_key, chunk, url, idx, len(text_chunks))
+            result = process_chunk(session, chunk, url, idx, len(text_chunks))
             chunk_results.append(result)
             time.sleep(1)  # 请求间隔
 
         # 生成汇总
-        final_summary = generate_final_summary(session, api_key, chunk_results, url)
+        final_summary = generate_final_summary(session, chunk_results, url)
 
         # 保存结果
         md_filename = os.path.splitext(filename)[0] + ".md"
-        output_path = os.path.join(result_dir, md_filename)
+        output_part_path = os.path.join(result_dir, os.path.basename("/part"))
+        os.makedirs(output_part_path, exist_ok=True)
+        output_part_path = os.path.join(output_part_path, os.path.basename(md_filename))
+
+        output_sum_path = os.path.join(result_dir, os.path.basename("/sum"))
+        os.makedirs(output_sum_path, exist_ok=True)
+        output_sum_path = os.path.join(output_sum_path, os.path.basename(md_filename))
         
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(f"# 论文分析报告\n\n")
+        #保存分块结果
+        with open(output_part_path, "w", encoding="utf-8") as f:
+            f.write(f"# 论文分块分析报告\n\n")
             f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
             f.write(f"## 分块分析\n")
             for i, res in enumerate(chunk_results, 1):
                 f.write(f"\n### 片段 {i}\n{res}\n")
-            f.write(f"\n## 最终汇总\n{final_summary}")
+        
+        #保存全文结果
+        with open(output_sum_path, "w", encoding="utf-8") as f:
+            f.write(f"# 论文全文分析报告\n\n")
+            f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
+            f.write(f"\n## \n{final_summary}")
             
-        print(f"成功保存: {output_path}")
+        print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
 
     except Exception as e:
         print(f"处理失败: {str(e)}")
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='arXiv论文分析工具')
-    parser.add_argument('--path', required=True, help='输入目录路径')
-    args = parser.parse_args()
-
-    API_KEY = ""
-    
+if __name__ == "__main__":    
     # 初始化环境
     os.makedirs(PDF_DIR, exist_ok=True)
-    result_dir = os.path.join("./result", os.path.basename(args.path.rstrip("/\\")))
+    result_dir = os.path.join(RESULT_DIR, os.path.basename(Path.rstrip("/\\")))
     os.makedirs(result_dir, exist_ok=True)
 
     # 创建会话
     session = setup_requests_session()
 
     # 处理文件
-    files = [f for f in os.listdir(args.path) if f.endswith(".txt")]
+    files = [f for f in os.listdir(Path) if f.endswith(".txt")]
     for filename in files:
         print(f"\n处理文件: {filename}")
-        with open(os.path.join(args.path, filename), "r", encoding="utf-8") as f:
+        with open(os.path.join(Path, filename), "r", encoding="utf-8") as f:
             url = f.readline().strip()
-            process_paper(session, API_KEY, filename, url, result_dir)
+            process_paper(session, filename, url, result_dir)

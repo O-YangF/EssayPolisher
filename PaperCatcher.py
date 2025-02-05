@@ -4,6 +4,16 @@ from typing import List
 from datetime import datetime
 import argparse
 import os
+from init import get_config # type: ignore
+
+config = get_config()
+
+# 使用配置参数
+DEFAULT_KEYWORD = config.DEFAULT_KEYWORD   # 默认检索关键词
+DEFAULT_SEARCH_COUNT = config.DEFAULT_SEARCH_COUNT   # 默认检索返回论文数量
+SEARCH_DIR = config.SEARCH_DIR   # 论文检索结果保存目录
+
+
 
 def query_academic_papers(
     keyword: str,
@@ -83,22 +93,11 @@ def save_paper_content(paper: Document, output_dir: str) -> None:
     print(f"成功保存论文到: {output_path}")
 
 def main():
-    # 配置命令行参数
-    parser = argparse.ArgumentParser(description='arXiv论文检索工具')
-    parser.add_argument('--key', type=str, default="TTA", 
-                       help='搜索关键词（默认：TTA）')
-    parser.add_argument('--name', type=str, default="default",
-                       help='输出目录（默认：default）')
-    parser.add_argument('--n', type=int, default=10,
-                       help='返回论文数量（默认：10）')
-    args = parser.parse_args()
-    
-    args.name = "res/"+args.name
     # 确保输出目录存在
-    os.makedirs(args.name, exist_ok=True)
+    os.makedirs(SEARCH_DIR, exist_ok=True)
     
     # 执行检索
-    papers = query_academic_papers(keyword=args.key, n=args.n)
+    papers = query_academic_papers(keyword=DEFAULT_KEYWORD, n=DEFAULT_SEARCH_COUNT)
     
     # 保存每篇论文的内容
     if not papers:
@@ -106,7 +105,7 @@ def main():
         return
     
     for i, paper in enumerate(papers, 1):
-        save_paper_content(paper, args.name)
+        save_paper_content(paper, SEARCH_DIR)
 
 if __name__ == "__main__":
     main()
