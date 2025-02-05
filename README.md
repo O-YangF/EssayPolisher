@@ -53,7 +53,9 @@ python paper_analyzer.py --path ./res/cv_papers
 ```
 /result/
   └─ [目录名]/
-      ├─ analysis_report_1.md
+    └─ [part]/
+      └─ analysis_report_1.md
+    └─ [sum]/
       └─ analysis_report_n.md
 ```
 
