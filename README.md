@@ -54,9 +54,9 @@ python paper_analyzer.py --path ./res/cv_papers
 /result/
   └─ [目录名]/
     └─ [part]/
-      └─ analysis_report_1.md
+      └─ analysis_report_part.md
     └─ [sum]/
-      └─ analysis_report_n.md
+      └─ analysis_report_sum.md
 ```
 
 ## 技术架构
