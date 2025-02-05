@@ -10,6 +10,11 @@ class Config:
         self.SEARCH_DIR = "./res"  # 论文检索结果保存目录
         self.Path = "./default"   #输入目录默认路径（包含论文链接文件）
 
+        # 论文检索配置
+        self.LOAD_MAX_DOCS = 100   #最大检索量
+        self.DEFAULT_KEYWORD = "TTA"  # 默认检索关键词
+        self.DEFAULT_SEARCH_COUNT = 10  # 默认检索返回论文数量
+
         # 网络请求配置
         self.MAX_RETRIES = 10  # 最大重试次数
         self.BACKOFF_FACTOR = 2  # 重试时的时间回退系数
@@ -22,10 +27,6 @@ class Config:
         self.API_KEY = "sk-uywzdvptgwqpouigeqtqropwllunxigdspbybwpvaaxhyxfg"  # API 密钥
         self.API_URL = "https://api.siliconflow.cn/v1/chat/completions"  # API 地址
         self.MODEL_ID = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"  # 模型 ID
-
-        # 论文检索配置
-        self.DEFAULT_KEYWORD = "TTA"  # 默认检索关键词
-        self.DEFAULT_SEARCH_COUNT = 10  # 默认检索返回论文数量
 
         # 其他配置
         self.LOG_LEVEL = "INFO"  # 日志级别

@@ -42,6 +42,8 @@ python arxiv_retriever.py --key "对比学习" --n 5 --name cv_papers
 /res/
   └─ [目录名]/
       ├─ YYYY-MM-DD-Title_1.txt
+      ├─ YYYY-MM-DD-Title_2.txt
+      ├─ ……
       └─ YYYY-MM-DD-Title_n.txt
 ```
 
@@ -69,20 +71,33 @@ graph TD
     E --> F[PDF解析]
     F --> G[分块处理]
     G --> H[AI分析]
-    H --> I[报告生成]
+    H --> I[分块报告生成]
+    I --> H
+    H --> J[全文报告生成]
 ```
 
 ## 配置说明
-1. 修改`.env`文件中的`API_KEY`为有效密钥
-2. 调整解析参数：
+1. 修改`init.py`文件中的`API_KEY`为有效密钥,`API_URL`为所调用模型API地址，`MODEL_ID`为所调用模型ID
+
+2. 可根据需要调整解析参数：
    ```python
-   # paper_analyzer.py
-   MAX_PDF_PAGES = 10    # 解析页数限制
-   CHUNK_SIZE = 10000    # 文本分块长度
-   MAX_RETRIES = 5       # 请求重试次数
+   # 系统路径配置
+   self.PDF_DIR = "./pdfs"  # PDF 文件保存目录
+   self.RESULT_DIR = "./result"  # 分析结果保存目录
+   self.SEARCH_DIR = "./res"  # 论文检索结果保存目录
+   self.Path = "./default"   #输入目录默认路径（包含论文链接文件）
+   
+   # 网络请求配置
+   
+   self.MAX_RETRIES = 10  # 最大重试次数
+   self.BACKOFF_FACTOR = 2  # 重试时的时间回退系数
+   
+   # PDF 解析配置
+   self.MAX_PDF_PAGES = 10  # 提取文本的最大页数
+   self.CHUNK_SIZE = 10000  # 文本分块长度
    ```
 
-## 典型输出示例
+## 可能的输出示例
 ```markdown
 # 论文分析报告
 
@@ -102,8 +117,8 @@ graph TD
 ```
 
 ## 注意事项
-1. API调用限制：每日1000次请求
-2. 建议单次检索不超过20篇论文
+1. API调用限制：目前默认模型只支持RPM=1000，TPM=50000
+2. 建议单次检索不超过300篇论文
 3. PDF解析支持英文论文效果最佳
 4. 完整文本获取需遵守ArXiv使用条款
 

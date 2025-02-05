@@ -12,13 +12,13 @@ config = get_config()
 DEFAULT_KEYWORD = config.DEFAULT_KEYWORD   # 默认检索关键词
 DEFAULT_SEARCH_COUNT = config.DEFAULT_SEARCH_COUNT   # 默认检索返回论文数量
 SEARCH_DIR = config.SEARCH_DIR   # 论文检索结果保存目录
-
+LOAD_MAX_DOCS = config.LOAD_MAX_DOCS
 
 
 def query_academic_papers(
     keyword: str,
     n: int = 10,
-    load_max_docs: int = 100,
+    load_max_docs: int = LOAD_MAX_DOCS,
     get_full_document: bool = False
 ) -> List[dict]:
     """
