@@ -239,7 +239,7 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
                 "model": MODEL_ID,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
-                "max_tokens": 8192
+                "max_tokens": 16384
             },
             headers={"Authorization": f"Bearer {API_KEY}"},
             timeout = Timeout 
@@ -319,7 +319,7 @@ def generate_final_summary(session, chunks: List[str], url: str) -> str:
                 "model": MODEL_ID,
                 "messages": [{"role": "user", "content": summary_prompt}],
                 "temperature": 0.2,
-                "max_tokens": 8192
+                "max_tokens": 16384
             },
             headers={"Authorization": f"Bearer {API_KEY}"},
             timeout = Timeout
