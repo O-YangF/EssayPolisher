@@ -9,6 +9,7 @@ class Config:
         self.RESULT_DIR = "./result"  # 分析结果保存目录
         self.SEARCH_DIR = "./res"  # 论文检索结果保存目录
         self.Path = "./default"   #输入目录默认路径（包含论文链接文件）
+        self.TIMEOUT = 120
 
         # 论文检索配置
         self.LOAD_MAX_DOCS = 100   #最大检索量
@@ -20,11 +21,11 @@ class Config:
         self.BACKOFF_FACTOR = 2  # 重试时的时间回退系数
 
         # PDF 解析配置
-        self.MAX_PDF_PAGES = 10  # 提取文本的最大页数
+        self.MAX_PDF_PAGES = 25  # 提取文本的最大页数
         self.CHUNK_SIZE = 10000  # 文本分块长度
 
         # API 配置
-        self.API_KEY = "sk-uywzdvptgwqpouigeqtqropwllunxigdspbybwpvaaxhyxfg"  # API 密钥
+        self.API_KEY = "sk-qsogvkfrxwfjzoraqutlrzouvbwshicpaznmrjoacdwdokvc"  # API 密钥
         self.API_URL = "https://api.siliconflow.cn/v1/chat/completions"  # API 地址
         self.MODEL_ID = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"  # 模型 ID
 

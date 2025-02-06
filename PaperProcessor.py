@@ -17,6 +17,7 @@ PDF_DIR = config.PDF_DIR  # PDF 文件保存目录
 RESULT_DIR = config.RESULT_DIR  # 分析结果保存目录
 SEARCH_DIR = config.SEARCH_DIR  # 论文检索结果保存目录
 Path = config.Path  #输入目录路径（包含论文链接文件）
+Timeout = config.TIMEOUT  #超时时间
 
 MAX_RETRIES = config.MAX_RETRIES # 最大重试次数
 BACKOFF_FACTOR = config.BACKOFF_FACTOR # 超时回退系数
@@ -52,7 +53,7 @@ def extract_arxiv_id(url: str) -> str:
 def download_pdf(url: str, save_path: str) -> bool:
     """下载PDF文件到指定路径（带进度显示）"""
     try:
-        response = requests.get(url, stream=True, timeout=30)
+        response = requests.get(url, stream=True, timeout=Timeout)
         response.raise_for_status()
         
         total_size = int(response.headers.get('content-length', 0))
@@ -81,7 +82,8 @@ def extract_pdf_text(pdf_path: str) -> List[str]:
         with pdfplumber.open(pdf_path) as pdf:
             for i, page in enumerate(pdf.pages[:MAX_PDF_PAGES]):
                 content = page.extract_text() or ""
-                clean_content = re.sub(r'\s+', ' ', content).strip()
+                clean_content = re.sub(r'\s+', ' ', content)
+                # .strip()
                 
                 words = clean_content.split()
                 for word in words:
@@ -106,10 +108,10 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
     """处理单个文本块"""
     prompt = f"""作为计算机科学领域研究员，请基于以下材料撰写论文分析报告（来自{url})：
                 {chunk[:CHUNK_SIZE]}
-                由于我提供给你的论文材料的一小块分块材料，当前进度：{chunk_num}/{total_chunks}，故请你首先判断该块属于论文的哪一大部分
-                （例如"abstract", "introduction", "method", "experiment", "conclusion"……等等关键章节），然后请你根据该关键章节选取下面要点进行组织内容，
-                无须全部写全，根据要点进行有倾向性的总结即可（例如摘要部分可以着重总结“核心问题解析”，而method部分可以着重总结“方法创新”
-                请严格按以下结构与你自己的判断有倾向性地选取结构中的部分进行组织内容（使用中文Markdown格式）：
+                由于我提供给你的论文材料的一小块分块材料，当前进度：{chunk_num}/{total_chunks}，故请你首先判断该块属于论文的哪一内容部分
+                （例如"abstract", "introduction", "method", "experiment", "conclusion"……等等关键章节），以及主要内容是什么，然后请你
+                根据判断结果选取下面要点组织内容，无须全部写全，根据判断得到的结果进行有倾向性的总结即可（例如摘要部分可以着重总结“核心问题解析”，而method部分可以着重总结“方法创新”
+                请严格按以下结构与你自己的判断有倾向性地选取结构中的部分进行组织内容（使用中文Markdown格式），注意需要在开头先对该分块进行一定的判断归类，说明其主要内容：
                 ## 核心问题解析
                     1. **研究动机**：用"问题三角"框架说明：
                     - 领域现状：当前领域的主流方法
@@ -162,6 +164,7 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
                 "max_tokens": 8192
             },
             headers={"Authorization": f"Bearer {API_KEY}"},
+            timeout = Timeout 
         )
         response.raise_for_status()
 
@@ -174,7 +177,7 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
 
 def generate_final_summary(session, chunks: List[str], url: str) -> str:
     """生成最终汇总报告"""
-    summary_prompt = f"""作为计算机科学领域研究员，请根据以下分析片段汇总论文：
+    summary_prompt = f"""作为计算机科学领域研究员，请根据以下全部的论文分析片段分块汇总，对该论文给出全文的总结：
                         论文地址: {url}
                         分析片段:
                         {'-'*40}
@@ -241,6 +244,7 @@ def generate_final_summary(session, chunks: List[str], url: str) -> str:
                 "max_tokens": 8192
             },
             headers={"Authorization": f"Bearer {API_KEY}"},
+            timeout = Timeout
         )
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
@@ -267,38 +271,39 @@ def process_paper(session, filename: str, url: str, result_dir: str):
         # 处理分块
         chunk_results = []
         for idx, chunk in enumerate(text_chunks, 1):
-            result = process_chunk(session, chunk, url, idx, len(text_chunks))
-            chunk_results.append(result)
+            # result = process_chunk(session, chunk, url, idx, len(text_chunks))
+            # chunk_results.append(result)
+            print(chunk+"\n\n")
             time.sleep(1)  # 请求间隔
 
-        # 生成汇总
-        final_summary = generate_final_summary(session, chunk_results, url)
+        # # 生成汇总
+        # final_summary = generate_final_summary(session, chunk_results, url)
 
-        # 保存结果
-        md_filename = os.path.splitext(filename)[0] + ".md"
-        output_part_path = os.path.join(result_dir, os.path.basename("/part"))
-        os.makedirs(output_part_path, exist_ok=True)
-        output_part_path = os.path.join(output_part_path, os.path.basename(md_filename))
+        # # 保存结果
+        # md_filename = os.path.splitext(filename)[0] + ".md"
+        # output_part_path = os.path.join(result_dir, os.path.basename("/part"))
+        # os.makedirs(output_part_path, exist_ok=True)
+        # output_part_path = os.path.join(output_part_path, os.path.basename(md_filename))
 
-        output_sum_path = os.path.join(result_dir, os.path.basename("/sum"))
-        os.makedirs(output_sum_path, exist_ok=True)
-        output_sum_path = os.path.join(output_sum_path, os.path.basename(md_filename))
+        # output_sum_path = os.path.join(result_dir, os.path.basename("/sum"))
+        # os.makedirs(output_sum_path, exist_ok=True)
+        # output_sum_path = os.path.join(output_sum_path, os.path.basename(md_filename))
         
-        #保存分块结果
-        with open(output_part_path, "w", encoding="utf-8") as f:
-            f.write(f"# 论文分块分析报告\n\n")
-            f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
-            f.write(f"## 分块分析\n")
-            for i, res in enumerate(chunk_results, 1):
-                f.write(f"\n### 片段 {i}\n{res}\n")
+        # #保存分块结果
+        # with open(output_part_path, "w", encoding="utf-8") as f:
+        #     f.write(f"# 论文分块分析报告\n\n")
+        #     f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
+        #     f.write(f"## 分块分析\n")
+        #     for i, res in enumerate(chunk_results, 1):
+        #         f.write(f"\n### 片段 {i}\n{res}\n")
         
-        #保存全文结果
-        with open(output_sum_path, "w", encoding="utf-8") as f:
-            f.write(f"# 论文全文分析报告\n\n")
-            f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
-            f.write(f"\n## \n{final_summary}")
+        # #保存全文结果
+        # with open(output_sum_path, "w", encoding="utf-8") as f:
+        #     f.write(f"# 论文全文分析报告\n\n")
+        #     f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
+        #     f.write(f"\n## \n{final_summary}")
             
-        print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
+        # print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
 
     except Exception as e:
         print(f"处理失败: {str(e)}")
