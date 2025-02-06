@@ -25,7 +25,7 @@ class Config:
         self.CHUNK_SIZE = 10000  # 文本分块长度
 
         # API 配置
-        self.API_KEY = "sk-qsogvkfrxwfjzoraqutlrzouvbwshicpaznmrjoacdwdokvc"  # API 密钥
+        self.API_KEY = ""  # API 密钥
         self.API_URL = "https://api.siliconflow.cn/v1/chat/completions"  # API 地址
         self.MODEL_ID = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"  # 模型 ID
 

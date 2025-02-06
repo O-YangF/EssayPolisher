@@ -2,6 +2,7 @@ import argparse
 import os
 import re
 import time
+import hashlib #哈希去重
 import requests # type: ignore
 import pdfplumber # type: ignore
 from typing import List, Tuple
@@ -9,6 +10,7 @@ from urllib.parse import urlparse
 from requests.adapters import HTTPAdapter # type: ignore
 from urllib3.util.retry import Retry # type: ignore
 from init import get_config # type: ignore
+from nltk.tokenize import sent_tokenize # type: ignore
 
 config = get_config()
 
@@ -72,34 +74,110 @@ def download_pdf(url: str, save_path: str) -> bool:
         print(f"\n下载失败 {url}: {str(e)}")
         return False
 
+def detect_section_change(page) -> bool:
+    """检测章节标题变化"""
+    # 基于字体特征检测标题（示例实现）
+    large_fonts = [char["size"] for char in page.chars if char["size"] > 14]
+    if len(large_fonts) > 3:
+        return True
+    # 基于关键词检测
+    text = page.extract_text()
+    if re.search(r'\b(Abstract|Introduction|Method|References)\b', text):
+        return True
+    return False
+
+def detect_section_change(page, content) -> bool:
+    """增强章节检测逻辑"""
+    # 基于字体特征检测
+    large_chars = [c for c in page.chars if c["size"] > 14]
+    if len(large_chars) > 5 and any(c["text"].isupper() for c in large_chars):
+        return True
+    
+    # 基于内容模式检测
+    section_pattern = r'''
+        ^\s*                # 起始空白
+        (?:                 
+            \d+             # 数字编号
+            [\.\s]+         # 分隔符
+            [A-Z]{3,}       # 大写标题单词
+        |  
+            [A-Z]{3,}       # 纯大写标题
+        )
+        \b
+    '''
+    return re.search(section_pattern, content, re.X) is not None
+
 def extract_pdf_text(pdf_path: str) -> List[str]:
     """分块提取PDF文本"""
     chunks = []
     current_chunk = []
     current_length = 0
+    processed_hashes = set()  # 新增重复内容检测
     
     try:
         with pdfplumber.open(pdf_path) as pdf:
             for i, page in enumerate(pdf.pages[:MAX_PDF_PAGES]):
-                content = page.extract_text() or ""
-                clean_content = re.sub(r'\s+', ' ', content)
-                # .strip()
-                
-                words = clean_content.split()
-                for word in words:
-                    if current_length + len(word) + 1 > CHUNK_SIZE:  # +1 for space
+                # 增强布局参数配置
+                text = page.filter(
+                    lambda obj: obj["object_type"] == "char" and obj["size"] > 8
+                ).extract_text(
+                    layout=True,
+                    x_tolerance=2,
+                    y_tolerance=3,
+                    keep_blank_chars=False
+                ) or ""
+
+                # 增强型文本清洗管道
+                clean_content = re.sub(r'(?<=\b)([A-Z])\s(?=[A-Z]\b)', r'\1', text)  # 修复大写单词分割
+                clean_content = re.sub(r'(\d)\s*-\s*(\d)', r'\1-\2', clean_content)  # 保留数字连字符
+                clean_content = re.sub(r'\s([\(\{\[\]\}\)])', r'\1', clean_content)  # 修复括号粘连
+                clean_content = re.sub(r'([A-Za-z])\s+(?=\d)', r'\1', clean_content)  # 修复字母数字粘连
+                clean_content = re.sub(r'\s{2,}', ' ', clean_content).strip()
+
+                # 新增重复内容检测
+                content_hash = hashlib.md5(clean_content.encode()).hexdigest()
+                if content_hash in processed_hashes:
+                    continue
+                processed_hashes.add(content_hash)
+
+                # 增强章节检测
+                if detect_section_change(page, clean_content):
+                    if current_chunk:
                         chunks.append(' '.join(current_chunk))
                         current_chunk = []
                         current_length = 0
-                    current_chunk.append(word)
-                    current_length += len(word) + 1
-                
-                if current_chunk:
-                    chunks.append(' '.join(current_chunk))
-                    current_chunk = []
-                    current_length = 0
+                    chunks.append(clean_content)  # 章节标题独立分块
+                    continue
+
+                # 智能分块逻辑
+                sentences = sent_tokenize(clean_content)
+                for sent in sentences:
+                    words = re.findall(r'\b\w+[\-/]?\w*\b|[\(\)\{\}\[\]]', sent)  # 增强单词分割
                     
+                    for word in words:
+                        estimated_length = current_length + len(word) + 1
+                        
+                        # 动态分块策略（允许±15%浮动）
+                        if estimated_length > CHUNK_SIZE * 1.15:
+                            if len(current_chunk) > CHUNK_SIZE * 0.3:
+                                chunks.append(' '.join(current_chunk))
+                                current_chunk = [word]
+                                current_length = len(word)
+                            else:
+                                current_chunk.append(word)
+                                current_length += len(word) + 1
+                        else:
+                            current_chunk.append(word)
+                            current_length += len(word) + 1
+
+                    # 句子完整性保护
+                    if current_chunk and current_length > CHUNK_SIZE * 0.8:
+                        chunks.append(' '.join(current_chunk))
+                        current_chunk = []
+                        current_length = 0
+
         return chunks
+
     except Exception as e:
         print(f"解析PDF失败 {pdf_path}: {str(e)}")
         return []
@@ -125,7 +203,7 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
                     |---------|---------|---------|---------|
                     | [维度1] | ...     | ...     | ...     |
                     | [维度2] | ...     | ...     | ...     |
-                    3. **关键公式**（至少2个）：
+                    3. **关键公式**：
                     - 公式1：$$...$$ （说明物理意义）
                     - 公式2：$$...$$ （解释创新点）
                 ## 实验验证
@@ -141,8 +219,8 @@ def process_chunk(session, chunk: str, url: str, chunk_num: int, total_chunks: i
                     1. **理论贡献**（分点说明）
                     2. **实践价值**（对工业界的影响）
                 ## 批判性分析
-                    1. **方法局限性**（分3点说明）
-                    2. **改进建议**（提出2条可行方向）
+                    1. **方法局限性**（分点说明）
+                    2. **改进建议**（提出可行方向）
                     3. **可复现性**：根据论文描述评估复现难度
                 ## 延伸思考
                     1. **关联工作**：列出3篇相关论文（非本文参考文献）并说明关联性
@@ -271,39 +349,39 @@ def process_paper(session, filename: str, url: str, result_dir: str):
         # 处理分块
         chunk_results = []
         for idx, chunk in enumerate(text_chunks, 1):
-            # result = process_chunk(session, chunk, url, idx, len(text_chunks))
-            # chunk_results.append(result)
-            print(chunk+"\n\n")
+            result = process_chunk(session, chunk, url, idx, len(text_chunks))
+            chunk_results.append(result)
+            # print(chunk+"\n\n")
             time.sleep(1)  # 请求间隔
 
-        # # 生成汇总
-        # final_summary = generate_final_summary(session, chunk_results, url)
+        # 生成汇总
+        final_summary = generate_final_summary(session, chunk_results, url)
 
-        # # 保存结果
-        # md_filename = os.path.splitext(filename)[0] + ".md"
-        # output_part_path = os.path.join(result_dir, os.path.basename("/part"))
-        # os.makedirs(output_part_path, exist_ok=True)
-        # output_part_path = os.path.join(output_part_path, os.path.basename(md_filename))
+        # 保存结果
+        md_filename = os.path.splitext(filename)[0] + ".md"
+        output_part_path = os.path.join(result_dir, os.path.basename("/part"))
+        os.makedirs(output_part_path, exist_ok=True)
+        output_part_path = os.path.join(output_part_path, os.path.basename(md_filename))
 
-        # output_sum_path = os.path.join(result_dir, os.path.basename("/sum"))
-        # os.makedirs(output_sum_path, exist_ok=True)
-        # output_sum_path = os.path.join(output_sum_path, os.path.basename(md_filename))
+        output_sum_path = os.path.join(result_dir, os.path.basename("/sum"))
+        os.makedirs(output_sum_path, exist_ok=True)
+        output_sum_path = os.path.join(output_sum_path, os.path.basename(md_filename))
         
-        # #保存分块结果
-        # with open(output_part_path, "w", encoding="utf-8") as f:
-        #     f.write(f"# 论文分块分析报告\n\n")
-        #     f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
-        #     f.write(f"## 分块分析\n")
-        #     for i, res in enumerate(chunk_results, 1):
-        #         f.write(f"\n### 片段 {i}\n{res}\n")
+        #保存分块结果
+        with open(output_part_path, "w", encoding="utf-8") as f:
+            f.write(f"# 论文分块分析报告\n\n")
+            f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
+            f.write(f"## 分块分析\n")
+            for i, res in enumerate(chunk_results, 1):
+                f.write(f"\n### 片段 {i}\n{res}\n")
         
-        # #保存全文结果
-        # with open(output_sum_path, "w", encoding="utf-8") as f:
-        #     f.write(f"# 论文全文分析报告\n\n")
-        #     f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
-        #     f.write(f"\n## \n{final_summary}")
+        #保存全文结果
+        with open(output_sum_path, "w", encoding="utf-8") as f:
+            f.write(f"# 论文全文分析报告\n\n")
+            f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
+            f.write(f"\n## \n{final_summary}")
             
-        # print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
+        print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
 
     except Exception as e:
         print(f"处理失败: {str(e)}")

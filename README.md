@@ -23,10 +23,23 @@
 ## 快速开始
 
 ### 环境配置
+
+#### 安装依赖库
 ```bash
-# 安装依赖库
-pip install langchain requests pdfplumber python-dotenv
+pip install langchain requests pdfplumber python-dotenv nltk
 ```
+#### 安装nltk分词器——(若网络不稳定，可以参考下面的替代方案)
+```bash
+python -c "import nltk; nltk.download('punkt')"
+```
+#### 安装nltk分词器替代方案
+
+1. 在python环境下使用`from nltk.book import *`命令,在报错中找到应该安装的路径(诸如`E:/nltk_data`、`C:\nltk_data`等)，自己取定一个最合适的路径。
+
+2. 进入本项目`./Other_EnvFile`目录，该目录下有一份已调试完成的`nltk_data`文件，将其复制放置于第一步中取定的一个对应路径(注意如果取定目标路径定在`E:/nltk_data`,应将`packages`包解压改名后直接放在`E`盘下)
+
+3. 在cmd中执行`python -c "import nltk; from nltk.book import *"`命令，如果成功打印出TEXT1~9无报错，即环境配置成功
+
 
 ### 检索论文
 ```bash
