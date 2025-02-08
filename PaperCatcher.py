@@ -1,4 +1,4 @@
-from langchain.retrievers import ArxivRetriever  # type: ignore
+from langchain_community.retrievers import ArxivRetriever # type: ignore
 from langchain.schema import Document  # type: ignore
 from typing import List
 from datetime import datetime
@@ -90,7 +90,7 @@ def save_paper_content(paper: Document, output_dir: str) -> None:
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(content))
     
-    print(f"成功保存论文到: {output_path}")
+    print(f"成功保存论文简介至: {output_path}")
 
 def main():
     # 确保输出目录存在

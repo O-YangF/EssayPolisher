@@ -67,7 +67,7 @@ def download_pdf(url: str, save_path: str) -> bool:
                 downloaded += len(chunk)
                 if total_size > 0:
                     progress = downloaded / total_size * 100
-                    print(f"\r下载进度: {progress:.1f}%", end='')
+                    print(f"\r原始PDF文件下载进度: {progress:.1f}%", end='')
         print()
         return True
     except Exception as e:
@@ -345,6 +345,8 @@ def process_paper(session, filename: str, url: str, result_dir: str):
         if not text_chunks:
             print("未提取到有效文本")
             return
+        else:
+            print("已成功预处理目标论文块，即将调用模型进行处理，该过程与远端api响应速度相关，请稍等")
 
         # 处理分块
         chunk_results = []
@@ -381,7 +383,7 @@ def process_paper(session, filename: str, url: str, result_dir: str):
             f.write(f"## 原文信息\n- 地址: [{url}]({url})\n")
             f.write(f"\n## \n{final_summary}")
             
-        print(f"成功保存分块结果至{output_part_path}，保存全文分析至{output_sum_path}")
+        print(f"成功保存分块处理结果至{output_part_path}\n成功保存全文分析结果至{output_sum_path}")
 
     except Exception as e:
         print(f"处理失败: {str(e)}")
@@ -397,8 +399,8 @@ if __name__ == "__main__":
 
     # 处理文件
     files = [f for f in os.listdir(Path) if f.endswith(".txt")]
-    for filename in files:
-        print(f"\n处理文件: {filename}")
+    for idx, filename in enumerate(files, 1):
+        print(f"\n即将处理第{idx}/{len(files)}篇目标论文: {filename}")  
         with open(os.path.join(Path, filename), "r", encoding="utf-8") as f:
             url = f.readline().strip()
             process_paper(session, filename, url, result_dir)

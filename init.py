@@ -9,7 +9,7 @@ class Config:
         self.RESULT_DIR = "./result"  # 分析结果保存目录
         self.SEARCH_DIR = "./res"  # 论文检索结果保存目录
         self.Path = "./default"   #输入目录默认路径（包含论文链接文件）
-        self.TIMEOUT = 120
+        self.TIMEOUT = 120   #超时时间为120
 
         # 论文检索配置
         self.LOAD_MAX_DOCS = 100   #最大检索量
