@@ -43,7 +43,7 @@ python -c "import nltk; nltk.download('punkt')"
 
 ### 检索论文
 ```bash
-python arxiv_retriever.py --key "对比学习" --n 5 --name cv_papers
+python ./PaperCatcher.py --key "对比学习" --n 5 --name cv_papers
 ```
 参数说明：
 - `--key`: 搜索关键词（默认："TTA"）
@@ -62,7 +62,7 @@ python arxiv_retriever.py --key "对比学习" --n 5 --name cv_papers
 
 ### 分析论文
 ```bash
-python paper_analyzer.py --path ./res/cv_papers
+python PaperProcessor.py --path ./res/cv_papers
 ```
 输出结构：
 ```
