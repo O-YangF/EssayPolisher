@@ -335,6 +335,7 @@ def process_paper(session, filename: str, url: str, result_dir: str):
             time.sleep(1)  # 请求间隔
 
         # 生成汇总
+        print("正在进入全文汇总阶段，请稍后")
         final_summary = generate_final_summary(session, chunk_results, url)
 
         # 保存结果
