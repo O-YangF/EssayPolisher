@@ -5,7 +5,7 @@ import argparse
 class Config:
     def __init__(self):
         # 系统路径配置
-        self.PDF_DIR = "./pdfs"  # PDF 文件保存目录
+        self.PDF_DIR = "./pdfs"  # PDF文件保存目录
         self.RESULT_DIR = "./result"  # 分析结果保存目录
         self.SEARCH_DIR = "./res"  # 论文检索结果保存目录
         self.Path = "./default"   #输入目录默认路径（包含论文链接文件）
