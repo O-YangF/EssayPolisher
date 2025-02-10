@@ -43,7 +43,7 @@ python -c "import nltk; nltk.download('punkt')"
 
 ### 检索论文
 ```bash
-python ./PaperCatcher.py --key "对比学习" --n 5 --name cv_papers
+python ./PaperCatcher.py --key "LLM" --n 5 --name cv_papers
 ```
 参数说明：
 - `--key`: 搜索关键词（默认："TTA"）
